@@ -1,5 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv_modules.hpp>
+// Add Plot library
 
 #ifdef HAVE_OPENCV_QUALITY
 #include <opencv2/dnn_superres.hpp>
@@ -97,7 +98,7 @@ static Vec2d getQualityValues(Mat orig, Mat upsampled)
 
 int main(int argc, char* argv[])
 {
-
+    // GET INPUT INFO start
     if (argc < 4) {
         cout << "usage:   Arg 1: image path  | Path to image" << endl;
         cout << "\t Arg 2: algorithm | edsr, espcn, fsrcnn or lapsrn" << endl;
@@ -105,7 +106,7 @@ int main(int argc, char* argv[])
         cout << "\t Arg 4: scale  | 2, 3, 4 or 8 \n";
         return -1;
     }
-
+    // GET INPUT INFO end
     string path = string(argv[1]);
     string algorithm = string(argv[2]);
     for (auto& x : algorithm) {
@@ -114,21 +115,24 @@ int main(int argc, char* argv[])
     
     string model = string(argv[3]);
     int scale = atoi(argv[4]);
-
+    // Read image file path
     Mat img = imread(path);
     if (img.empty()) {
         cerr << "Couldn't load image: " << img << "\n";
         return -2;
     }
     imshow("img original", img);
-
+    //Get image dimensions
     int width = img.cols - (img.cols % scale);
     int height = img.rows - (img.rows % scale);
+    // Create cropped image
     Mat cropped = img(Rect(0, 0, width, height));
     
     Mat img_downscaled;
+    // Create downscaled image
     resize(cropped, img_downscaled, Size(), 1.0 / scale, 1.0 / scale);
 
+    // SR using DNN method implementation
     DnnSuperResImpl sr;
 
     vector <Mat> allImages;
@@ -138,21 +142,30 @@ int main(int argc, char* argv[])
     sr.setModel(algorithm, scale);
     sr.upsample(img_downscaled, img_new);
     sr.upsample(cropped, img_new2);
+    // Show first img
     imshow("img new ", img_new);
+    // Show second img
     imshow("img2", img_new2);
+    // Save first image
     imwrite("E:\\test_bun\\ConsoleApplication1\\output.png", img_new);
+
+    // Create vectors for values of PSNR and SSIM
     vector<double> psnrValues = vector<double>();
     vector<double> ssimValues = vector<double>();
 
+    // Call function getQualityValues to get the PSNR and SSIM values of img_new
     Vec2f quality = getQualityValues(cropped, img_new);
 
     psnrValues.push_back(quality[0]);
     ssimValues.push_back(quality[1]);
-
+    // Print values of PSNR and SSIM
     cout << sr.getAlgorithm() << ":" << endl;
     cout << "PSNR: " << quality[0] << " SSIM: " << quality[1] << endl;
     cout << "----------------------" << endl;
+    // SR with DNN method end here
 
+    // Classic methods start here
+    // 
     //BICUBIC
     Mat bicubic;
     resize(img_downscaled, bicubic, Size(), scale, scale, INTER_CUBIC);
@@ -191,8 +204,10 @@ int main(int argc, char* argv[])
 
     vector <Mat> imgs{ img_new, bicubic, nearest, lanczos };
     vector <String> titles{ sr.getAlgorithm(), "Bicubic", "Nearest neighbor", "Lanczos" };
+    
     showBenchmark(imgs, "Quality benchmark", Size(bicubic.cols, bicubic.rows), titles, psnrValues, ssimValues);
-
+    // Plot for PSNR values and SSIM values
+   
     waitKey(0);
 
     return 0;
@@ -200,6 +215,7 @@ int main(int argc, char* argv[])
 #else
 int main()
 {
+    // If OpenCV lib issue, display the following: 
     std::cout << "This sample requires the OpenCV Quality module." << std::endl;
     return 0;
 }
