@@ -1,5 +1,10 @@
 #include <iostream>
 #include <opencv2/opencv_modules.hpp>
+#include <cstdio>
+#include <Windows.h>
+#include <filesystem>
+using recursive_directory_iterator = std::filesystem::recursive_directory_iterator;
+
 // Add Plot library
 
 #ifdef HAVE_OPENCV_QUALITY
@@ -7,6 +12,7 @@
 #include <opencv2/quality.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+
 
 using namespace std;
 using namespace cv;
@@ -96,6 +102,22 @@ static Vec2d getQualityValues(Mat orig, Mat upsampled)
     return Vec2d(psnr, ssim);
 }
 
+/* Function to apply bicubic algorithm
+void applyBicubic(Mat img_downscaled, int scale, Mat cropped, vector<double> psnrValues, vector<double> ssimValues) {
+    //BICUBIC
+    Mat bicubic;
+    resize(img_downscaled, bicubic, Size(), scale, scale, INTER_CUBIC);
+    Vec2f quality = getQualityValues(cropped, bicubic);
+
+    psnrValues.push_back(quality[0]);
+    //dataFile << quality[0]; // write data to file
+    ssimValues.push_back(quality[1]);
+
+    cout << "Bicubic " << endl;
+    cout << "PSNR: " << quality[0] << " SSIM: " << quality[1] << endl;
+    cout << "----------------------" << endl;
+}
+*/
 int main(int argc, char* argv[])
 {
     // GET INPUT INFO start
@@ -112,22 +134,25 @@ int main(int argc, char* argv[])
     for (auto& x : algorithm) {
         x = tolower(x);
     }
-    
+
     string model = string(argv[3]);
     int scale = atoi(argv[4]);
-    // Read image file path
+
+    // iterate through images -- To work on -- too much RAM consumption for what is supposed to be a simple task
+    // for (const auto& dirEntry : recursive_directory_iterator(path)) {
+    // Mat img = imread(dirEntry.path().string());
     Mat img = imread(path);
     if (img.empty()) {
         cerr << "Couldn't load image: " << img << "\n";
         return -2;
     }
-    imshow("img original", img);
+    
     //Get image dimensions
     int width = img.cols - (img.cols % scale);
     int height = img.rows - (img.rows % scale);
     // Create cropped image
     Mat cropped = img(Rect(0, 0, width, height));
-    
+
     Mat img_downscaled;
     // Create downscaled image
     resize(cropped, img_downscaled, Size(), 1.0 / scale, 1.0 / scale);
@@ -138,25 +163,35 @@ int main(int argc, char* argv[])
     vector <Mat> allImages;
     Mat img_new;
     Mat img_new2;
+
     sr.readModel(model);
     sr.setModel(algorithm, scale);
     sr.upsample(img_downscaled, img_new);
     sr.upsample(cropped, img_new2);
+
     // Show first img
-    imshow("img new ", img_new);
+    //imshow("img new", img_new);
     // Show second img
-    imshow("img2", img_new2);
-    // Save first image
-    imwrite("E:\\test_bun\\ConsoleApplication1\\output.png", img_new);
+    //imshow("img2", img_new2);
 
     // Create vectors for values of PSNR and SSIM
     vector<double> psnrValues = vector<double>();
     vector<double> ssimValues = vector<double>();
 
+    // Create output file stream to write values to plot afterwards.
+    /*
+    ofstream dataFile("plt_data.txt");
+    if (!dataFile.is_open()) {
+        cerr << "Error:Unable to open data file!!!" << endl;
+        return -1;
+    }
+    */  
+
     // Call function getQualityValues to get the PSNR and SSIM values of img_new
     Vec2f quality = getQualityValues(cropped, img_new);
 
     psnrValues.push_back(quality[0]);
+    //dataFile << quality[0]; // write data to file
     ssimValues.push_back(quality[1]);
     // Print values of PSNR and SSIM
     cout << sr.getAlgorithm() << ":" << endl;
@@ -167,16 +202,20 @@ int main(int argc, char* argv[])
     // Classic methods start here
     // 
     //BICUBIC
+
     Mat bicubic;
     resize(img_downscaled, bicubic, Size(), scale, scale, INTER_CUBIC);
     quality = getQualityValues(cropped, bicubic);
 
     psnrValues.push_back(quality[0]);
+    //dataFile << quality[0]; // write data to file
     ssimValues.push_back(quality[1]);
 
     cout << "Bicubic " << endl;
     cout << "PSNR: " << quality[0] << " SSIM: " << quality[1] << endl;
     cout << "----------------------" << endl;
+
+    //applyBicubic(img_downscaled, scale, cropped, psnrValues, ssimValues); // call function to apply Bicubic algorithm
 
     //NEAREST NEIGHBOR
     Mat nearest;
@@ -184,6 +223,7 @@ int main(int argc, char* argv[])
     quality = getQualityValues(cropped, nearest);
 
     psnrValues.push_back(quality[0]);
+    //dataFile << quality[0]; // write data to file
     ssimValues.push_back(quality[1]);
 
     cout << "Nearest neighbor" << endl;
@@ -196,6 +236,7 @@ int main(int argc, char* argv[])
     quality = getQualityValues(cropped, lanczos);
 
     psnrValues.push_back(quality[0]);
+    //dataFile << quality[0]; // write data to file
     ssimValues.push_back(quality[1]);
 
     cout << "Lanczos" << endl;
@@ -204,14 +245,38 @@ int main(int argc, char* argv[])
 
     vector <Mat> imgs{ img_new, bicubic, nearest, lanczos };
     vector <String> titles{ sr.getAlgorithm(), "Bicubic", "Nearest neighbor", "Lanczos" };
-    
-    showBenchmark(imgs, "Quality benchmark", Size(bicubic.cols, bicubic.rows), titles, psnrValues, ssimValues);
-    // Plot for PSNR values and SSIM values
-   
-    waitKey(0);
 
+    //dataFile.close();
+    showBenchmark(imgs, "Quality benchmark", Size(bicubic.cols, bicubic.rows), titles, psnrValues, ssimValues);
+
+    // TODO : Plot for PSNR values and SSIM values
+        /*
+    FILE* pipe = _popen("gnuplot -persist", "w"); // Use "popen" for Linux
+
+    if (!pipe) {
+        std::cerr << "Error: Unable to open GNUPLOT pipe!!!" << std::endl;
+        return -1;
+    }
+
+    // Send GNUPLOT commands
+    fprintf(pipe, "plot 'plt_data.txt' with lines\n");
+    fflush(pipe);
+
+    // Close the pipe
+    _pclose(pipe); // Use "pclose" for Linux
+        
+    // Currently not enough data to plot 
+    */
+
+    waitKey(0); 
+ 
+    //}
+
+    // TODO - MEMORY MANAGEMENT OPTIMIZATION
     return 0;
 }
+ 
+
 #else
 int main()
 {
