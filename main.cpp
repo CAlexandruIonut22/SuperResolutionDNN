@@ -106,15 +106,13 @@ int main(int argc, char* argv[])
 {
     // TODO: CHANGE INPUT FORM - > to wait for values and different questions
     if (argc < 4) {
-        cout << "usage:   Arg 1: image path  | Path to image" << endl;
-        cout << "\t Arg 2: algorithm | edsr, espcn, fsrcnn or lapsrn" << endl; 
-        cout << "\t Arg 3: path to model file 2 \n"; // add model files to separate folder to contain them all
-        cout << "\t Arg 4: scale  | 2, 3, 4 or 8 \n";
+        cout << "The image path | Path to image" << endl;
+        cout << "\t The algorithm | edsr, espcn, fsrcnn or lapsrn" << endl; 
+        cout << "\t The path to the model file 2 \n"; 
         return -1;
     }
 
 
-    // GET INPUT INFO end
     string path = string(argv[1]);
     string algorithm = string(argv[2]);
     for (auto& x : algorithm) {
@@ -122,8 +120,8 @@ int main(int argc, char* argv[])
     }
 
     string model = string(argv[3]);
-    int scale = atoi(argv[4]);
-
+    int scale = int(model[model.length() - 4] - '0'); // Takes the scale number from the file name, 
+    // keep in mind file format for models matter
 
     Mat img = imread(path);
     if (img.empty()) {
@@ -235,24 +233,7 @@ int main(int argc, char* argv[])
     showBenchmark(imgs, "Quality benchmark", Size(bicubic.cols, bicubic.rows), titles, psnrValues, ssimValues);
 
     // TODO : Plot for PSNR values and SSIM values
-        /*
-    FILE* pipe = _popen("gnuplot -persist", "w"); // Use "popen" for Linux
-
-    if (!pipe) {
-        std::cerr << "Error: Unable to open GNUPLOT pipe!!!" << std::endl;
-        return -1;
-    }
-
-    // Send GNUPLOT commands
-    fprintf(pipe, "plot 'plt_data.txt' with lines\n");
-    fflush(pipe);
-
-    // Close the pipe
-    _pclose(pipe); // Use "pclose" for Linux
         
-    // Currently not enough data to plot 
-    */
-
     waitKey(0); 
  
     //}
